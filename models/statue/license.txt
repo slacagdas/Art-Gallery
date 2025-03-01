@@ -1,0 +1,8 @@
+Model Information:
+* title:	Broken Vase Art Photoscan LOWPOLY
+* source:	https://sketchfab.com/3d-models/broken-vase-art-photoscan-lowpoly-6604442df99e439db35b9535c7e38ef4
+* author:	EvanLegrand (https://sketchfab.com/evan4129)
+
+Model License:
+* license type:	SKETCHFAB Standard (https://sketchfab.com/licenses)
+* requirements:	Under basic restrictions, use worldwide, on all types of media, commercially or not, and in all types of derivative works

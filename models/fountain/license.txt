@@ -1,0 +1,8 @@
+Model Information:
+* title:	Arkas fountain, photogrammetry
+* source:	https://sketchfab.com/3d-models/arkas-fountain-photogrammetry-97daa33a431f4e3b9ae1875786a47d18
+* author:	yaro.pro (https://sketchfab.com/yaro.pro)
+
+Model License:
+* license type:	SKETCHFAB Standard (https://sketchfab.com/licenses)
+* requirements:	Under basic restrictions, use worldwide, on all types of media, commercially or not, and in all types of derivative works

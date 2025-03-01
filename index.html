@@ -1,0 +1,781 @@
+<!-- 
+    -----------------------------------------------------------------------------------
+    Title: CMPE360 - Homework: Art Gallery Museum
+    Author: Aybegüm Doğan, Sıla Çağdaş
+    ID: 18062600328, 
+    Section: 1
+    Project (Homework) No: 8
+    Description:
+    -----------------------------------------------------------------------------------
+-->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+
+    <!-- 
+        The viewport meta tag ensures proper scaling on mobile devices. 
+        It makes the page scale to the device's width.
+    -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Art Gallery Museum</title>
+
+    <!-- 
+        Basic CSS to style the body and canvas elements:
+        - margin: 0 removes default page margin
+        - overflow: hidden hides scrollbars
+    -->
+    <style>
+        body { 
+            margin: 0; 
+            overflow: hidden; 
+        }
+        canvas { 
+            display: block; 
+        }
+        /* 
+           A small info box at the top-left corner of the screen 
+           to display user controls (keyboard keys).
+        */
+        #info {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: white;
+            font-family: Arial, sans-serif;
+            font-size: 14px;
+            background: rgba(0,0,0,0.5);
+            padding: 10px;
+            z-index: 100;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- 
+        This div displays brief control instructions in the top-left corner
+        explaining how to move around with the keyboard.
+    -->
+    <div id="info">
+        Controls:<br>
+        W - Forward<br>
+        S - Backward<br>
+        A - Left<br>
+        D - Right<br>
+        ← → - Turn Left/Right<br>
+        ↑ ↓ - Look Up/Down
+    </div>
+
+    <!-- 
+        THREE.js main library (version r128 or higher via CDN)
+    -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+    <!-- 
+        GLTFLoader: used to load .gltf / .glb models. 
+        Must be included after THREE.js since it is an addon.
+    -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+
+    <script>
+        /*
+            Global variables:
+            - scene, camera, renderer: standard Three.js setup
+            - movement/looking flags (moveForward, moveBackward, etc.) for keyboard controls
+            - velocity, direction: used to handle movement
+            - clock: tracks delta time for smooth animation and movement
+        */
+        let scene, camera, renderer;
+        let moveForward = false;
+        let moveBackward = false;
+        let moveLeft = false;
+        let moveRight = false;
+        let lookLeft = false;
+        let lookRight = false;
+        let lookUp = false;
+        let lookDown = false;
+        let velocity = new THREE.Vector3();
+        let direction = new THREE.Vector3();
+        let clock = new THREE.Clock();
+
+        /**
+         * init()
+         * -----------------------------------------------------------------
+         * Summary: Initializes the scene, camera, renderer, and overall setup.
+         * 1) Creates the scene.
+         * 2) Sets up the camera, including initial position and rotation order.
+         * 3) Creates the renderer (with antialiasing) and configures shadow properties.
+         * 4) Calls helper functions to create skybox, lights, room, artworks, etc.
+         * 5) Loads external 3D models onto stands.
+         * 6) Adds keyboard listeners and a window resize event listener.
+         * 7) Starts the animation loop.
+         */
+        function init() {
+            scene = new THREE.Scene();
+
+            
+            camera = new THREE.PerspectiveCamera(
+                75,
+                window.innerWidth / window.innerHeight,
+                0.1,
+                1000
+            );
+           
+            camera.position.set(0, 1.7, 5);
+          
+            camera.rotation.order = 'YXZ';
+
+          
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.shadowMap.enabled = true;                 
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;  
+            document.body.appendChild(renderer.domElement);
+
+            // Create the skybox (background)
+            createSkybox();
+
+            // Setup different lights
+            setupLights();
+
+            // Create room (floor and walls)
+            createRoom();
+
+            // Create artworks (paintings)
+            createArtworks();
+
+            // Create sample sculptures (using icosahedron geometry)
+            createSculptures();
+
+            // Create furniture (e.g., benches)
+            createFurniture();
+
+            // Create an interactive installation with shaders
+            createInteractiveInstallation();
+
+            // Load external models on stands
+            // -------------------------------------------------------------------------
+            loadModelOnStand(
+                './models/vase/scene.gltf',  // path to the model
+                10,                          // stand X
+                5,                           // stand Z
+                1                            // scale factor
+            );
+
+            loadModelOnStand(
+                './models/sculpture_freepolyorg/scene.gltf',
+                10,
+                0,
+                0.5
+            );
+
+            loadModelOnStand(
+                './models/statue/scene.gltf',
+                10,
+                -5,
+                1
+            );
+
+            loadModelOnStand(
+                './models/candles_set/scene.gltf',
+                -10,
+                5,
+                4
+            );
+
+            loadModelOnStand(
+                './models/vase2/scene.gltf',
+                -10,
+                0,
+                5
+            );
+
+            loadModelOnStand(
+                './models/angel/scene.gltf',
+                -10,
+                -5,
+                1
+            );
+            // -------------------------------------------------------------------------
+
+            // Keyboard event listeners
+            document.addEventListener('keydown', onKeyDown, false);
+            document.addEventListener('keyup', onKeyUp, false);
+
+            // Update camera and renderer when the window is resized
+            window.addEventListener('resize', onWindowResize, false);
+
+            // Start the animation loop
+            animate();
+        }
+
+        /**
+         * onKeyDown(event)
+         * -----------------------------------------------------------
+         * Summary: Sets movement/look flags to true when keys are pressed.
+         * @param {Object} event - The keydown event
+         */
+        function onKeyDown(event) {
+            switch(event.code) {
+                case 'KeyW':
+                    moveForward = true;
+                    break;
+                case 'KeyS':
+                    moveBackward = true;
+                    break;
+                case 'KeyD':
+                    moveLeft = true;
+                    break;
+                case 'KeyA':
+                    moveRight = true;
+                    break;
+                case 'ArrowLeft':
+                    lookLeft = true;
+                    break;
+                case 'ArrowRight':
+                    lookRight = true;
+                    break;
+                case 'ArrowDown':
+                    lookUp = true;
+                    break;
+                case 'ArrowUp':
+                    lookDown = true;
+                    break;
+            }
+        }
+
+        /**
+         * onKeyUp(event)
+         * -----------------------------------------------------------
+         * Summary: Sets movement/look flags to false when keys are released.
+         * @param {Object} event - The keyup event
+         */
+        function onKeyUp(event) {
+            switch(event.code) {
+                case 'KeyW':
+                    moveForward = false;
+                    break;
+                case 'KeyS':
+                    moveBackward = false;
+                    break;
+                case 'KeyD':
+                    moveLeft = false;
+                    break;
+                case 'KeyA':
+                    moveRight = false;
+                    break;
+                case 'ArrowLeft':
+                    lookLeft = false;
+                    break;
+                case 'ArrowRight':
+                    lookRight = false;
+                    break;
+                case 'ArrowDown':
+                    lookUp = false;
+                    break;
+                case 'ArrowUp':
+                    lookDown = false;
+                    break;
+            }
+        }
+
+        /**
+         * createSkybox()
+         * ------------------------------------------
+         * Summary: Creates a skybox using a cube texture.
+         * - Loads px.png, nx.png, etc., from the specified folder
+         * - Sets scene.background to the resulting cubemap
+         */
+        function createSkybox() {
+            const loader = new THREE.CubeTextureLoader();
+            loader.setPath('./textures/skybox/'); 
+
+            const skyboxTexture = loader.load([
+                'px.png',  // Positive X
+                'nx.png',  // Negative X
+                'py.png',  // Positive Y
+                'ny.png',  // Negative Y
+                'pz.png',  // Positive Z
+                'nz.png'   // Negative Z
+            ]);
+            scene.background = skyboxTexture;
+        }
+
+        /**
+         * setupLights()
+         * ------------------------------------------
+         * Summary: Adds multiple lights to the scene:
+         * 1) An ambient light for overall low-intensity lighting
+         * 2) A main spotlight from above
+         * 3) Several spotlights aimed at the back wall
+         */
+        function setupLights() {
+            
+            const ambient = new THREE.AmbientLight(0xffffff, 0.4);
+            scene.add(ambient);
+
+            
+            const mainSpot = new THREE.SpotLight(0xffffff, 0.8);
+            mainSpot.position.set(0, 10, 0);
+            mainSpot.castShadow = true;
+            scene.add(mainSpot);
+
+            
+            for (let i = 0; i < 6; i++) {
+                const spotLight = new THREE.SpotLight(0xffffff, 0.5);
+                spotLight.position.set(-15 + i * 6, 5, -9);
+                spotLight.target.position.set(-15 + i * 6, 0, -9);
+                spotLight.castShadow = true;
+                scene.add(spotLight);
+                scene.add(spotLight.target);
+            }
+        }
+
+        /**
+         * createRoom()
+         * ------------------------------------------
+         * Summary: Builds the floor and three walls (back, left, right).
+         * - Floor uses a hardwood texture
+         * - Walls use a simple MeshStandardMaterial
+         */
+        function createRoom() {
+           
+            const floorTexture = new THREE.TextureLoader().load(
+                'https://threejs.org/examples/textures/hardwood2_diffuse.jpg'
+            );
+            floorTexture.wrapS = floorTexture.wrapT = THREE.RepeatWrapping;
+            floorTexture.repeat.set(8, 8);
+
+            const floorMaterial = new THREE.MeshStandardMaterial({ 
+                map: floorTexture,
+                roughness: 0.8,
+                metalness: 0.2
+            });
+            const floor = new THREE.Mesh(
+                new THREE.PlaneGeometry(40, 40),
+                floorMaterial
+            );
+            
+            floor.rotation.x = -Math.PI / 2;
+            
+            floor.receiveShadow = true;
+            scene.add(floor);
+
+           
+            const wallMaterial = new THREE.MeshStandardMaterial({ color: 0xf0f0f0 });
+            const wallGeometry = new THREE.PlaneGeometry(40, 10);
+
+            
+            const backWall = new THREE.Mesh(wallGeometry, wallMaterial);
+            backWall.position.z = -20;
+            backWall.receiveShadow = true;
+            scene.add(backWall);
+
+           
+            const leftWall = new THREE.Mesh(wallGeometry, wallMaterial);
+            leftWall.position.x = -20;
+            leftWall.rotation.y = Math.PI / 2;
+            leftWall.receiveShadow = true;
+            scene.add(leftWall);
+
+          
+            const rightWall = new THREE.Mesh(wallGeometry, wallMaterial);
+            rightWall.position.x = 20;
+            rightWall.rotation.y = -Math.PI / 2;
+            rightWall.receiveShadow = true;
+            scene.add(rightWall);
+        }
+
+        /**
+         * createFurniture()
+         * ------------------------------------------
+         * Summary: Main function for adding furniture to the scene.
+         * Currently it only calls createBenches().
+         */
+        function createFurniture() {
+            createBenches();
+        }
+
+        /**
+         * createBenches()
+         * ------------------------------------------
+         * Summary: Creates two simple benches and places them in the scene.
+         */
+        function createBenches() {
+            const benchMaterial = new THREE.MeshStandardMaterial({ 
+                color: 0x8b4513,
+                roughness: 0.4,
+                metalness: 0.1
+            });
+
+            for (let i = 0; i < 2; i++) {
+            
+                const benchGeometry = new THREE.BoxGeometry(3, 0.4, 0.8);
+                const bench = new THREE.Mesh(benchGeometry, benchMaterial);
+
+               
+                bench.position.set(-5 + i * 10, 0.2, -10);
+                bench.castShadow = true;
+                bench.receiveShadow = true;
+                scene.add(bench);
+
+                
+                const legGeometry = new THREE.BoxGeometry(0.1, 0.2, 0.6);
+                const legPositions = [
+                    [-1.4, 0.1, 0],
+                    [ 1.4, 0.1, 0]
+                ];
+
+                legPositions.forEach(pos => {
+                    const leg = new THREE.Mesh(legGeometry, benchMaterial);
+                    leg.position.set(
+                        bench.position.x + pos[0],
+                        pos[1],
+                        bench.position.z + pos[2]
+                    );
+                    leg.castShadow = true;
+                    leg.receiveShadow = true;
+                    scene.add(leg);
+                });
+            }
+        }
+
+        /**
+         * createArtworks()
+         * ------------------------------------------
+         * Summary: Creates paintings on the back wall.
+         * - Each painting is a 4x3 plane with a texture.
+         * - Adds frames around each painting (a small box geometry).
+         */
+        function createArtworks() {
+            const paintingGeometry = new THREE.PlaneGeometry(4, 3);
+            const paintings = [
+                './textures/frames/content1.jpg',
+                './textures/frames/content2.jpg',
+                './textures/frames/content3.jpg',
+                './textures/frames/content4.jpg',
+                './textures/frames/content5.jpg',
+                './textures/frames/content6.jpg'
+            ];
+            
+            paintings.forEach((url, i) => {
+                const texture = new THREE.TextureLoader().load(url);
+                const paintingMaterial = new THREE.MeshStandardMaterial({
+                    map: texture,
+                    metalness: 0,
+                    roughness: 0.2,
+                    depthWrite: true,
+                    depthTest: true
+                });
+
+               
+                const painting = new THREE.Mesh(paintingGeometry, paintingMaterial);
+                painting.position.set(-15 + i * 6, 3, -19.5);
+                painting.castShadow = true;
+                painting.renderOrder = 1; 
+                scene.add(painting);
+
+               
+                const frameGeometry = new THREE.BoxGeometry(4.4, 3.4, 0.2);
+                const frameMaterial = new THREE.MeshStandardMaterial({
+                    color: 0x8b4513,
+                    depthWrite: true,
+                    depthTest: true
+                });
+                const frame = new THREE.Mesh(frameGeometry, frameMaterial);
+                frame.position.copy(painting.position);
+                frame.position.z -= 0.15;
+                frame.castShadow = true;
+                frame.renderOrder = 0;
+                scene.add(frame);
+            });
+        }
+
+        /**
+         * createSculptures()
+         * ------------------------------------------
+         * Summary: Creates 3 simple cubic pedestals with icosahedron sculptures on top.
+         * - Each pedestal/sculpture can cast and receive shadows.
+         * - The sculptures have a small rotation animation.
+         */
+        function createSculptures() {
+            for (let i = 0; i < 3; i++) {
+                
+                const pedestalGeometry = new THREE.BoxGeometry(2, 1, 2);
+                const pedestalMaterial = new THREE.MeshStandardMaterial({ color: 0xdddddd });
+                const pedestal = new THREE.Mesh(pedestalGeometry, pedestalMaterial);
+                pedestal.position.set(-10 + i * 10, 0.5, -10);
+                pedestal.castShadow = true;
+                pedestal.receiveShadow = true;
+                scene.add(pedestal);
+
+                const sculptureGeometry = new THREE.IcosahedronGeometry(0.7);
+                const sculptureMaterial = new THREE.MeshStandardMaterial({ 
+                    color: 0xffd700,
+                    metalness: 0.8,
+                    roughness: 0.2
+                });
+                const sculpture = new THREE.Mesh(sculptureGeometry, sculptureMaterial);
+                sculpture.position.copy(pedestal.position);
+                sculpture.position.y += 1.5; // Raise it above the pedestal
+                sculpture.castShadow = true;
+                scene.add(sculpture);
+
+                
+                sculpture.userData.rotationSpeed = 0.005;
+                sculpture.userData.isAnimated = true;
+            }
+        }
+
+        /**
+         * createInteractiveInstallation()
+         * -------------------------------------------------
+         * Summary: Demonstrates a shader-based object (a TorusKnot).
+         * - Uses custom vertex/fragment shaders to create a color transition effect.
+         */
+        function createInteractiveInstallation() {
+            const torusGeometry = new THREE.TorusKnotGeometry(1, 0.3, 100, 16);
+
+            
+            const torusMaterial = new THREE.ShaderMaterial({
+                vertexShader: `
+                    varying vec3 vNormal;
+                    varying vec3 vPosition;
+                    
+                    void main() {
+                        vNormal = normalize(normalMatrix * normal);
+                        vPosition = position;
+                        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                    }
+                `,
+                fragmentShader: `
+                    varying vec3 vNormal;
+                    varying vec3 vPosition;
+                    
+                    void main() {
+                        // Simple light/color calculation: 
+                        // using vNormal and a greenish light direction
+                        float intensity = pow(0.5 - dot(vNormal, vec3(0, 0, 1.0)), 2.0);
+                        vec3 color = mix(
+                            vec3(1.0, 0.0, 0.0),  // red
+                            vec3(0.0, 0.0, 1.0),  // blue
+                            intensity
+                        );
+                        gl_FragColor = vec4(color, 1.0);
+                    }
+                `
+            });
+
+            const torus = new THREE.Mesh(torusGeometry, torusMaterial);
+            // Position above the floor, near the back wall
+            torus.position.set(0, 3, -5);
+            torus.castShadow = true;
+            torus.userData.isAnimated = true; // Mark it for rotation updates
+            scene.add(torus);
+        }
+
+        /**
+         * createEmptyStand(standX, standZ)
+         * -------------------------------------------------
+         * Summary: Creates a plain stand for placing models on top.
+         * @param {number} standX - The x-position of the stand
+         * @param {number} standZ - The z-position of the stand
+         */
+        function createEmptyStand(standX, standZ) {
+            const standGeom = new THREE.BoxGeometry(2, 1, 2);
+            const standMat = new THREE.MeshStandardMaterial({ color: 0xaaaaaa });
+            const stand = new THREE.Mesh(standGeom, standMat);
+            stand.castShadow = true;
+            stand.receiveShadow = true;
+
+            // Move it up so that the top is at y=1
+            stand.position.set(standX, 0.5, standZ);
+            scene.add(stand);
+        }
+
+        /**
+         * loadModelOnStand(modelPath, standX, standZ, scaleVal)
+         * ----------------------------------------------------------------------------
+         * Summary: Creates a stand at the given position, then loads a GLTF model on top.
+         * @param {string} modelPath  - Path to the .gltf model
+         * @param {number} standX     - X-position for the stand
+         * @param {number} standZ     - Z-position for the stand
+         * @param {number} scaleVal   - Scale factor for the loaded model
+         */
+        function loadModelOnStand(modelPath, standX, standZ, scaleVal) {
+            
+            const standGeom = new THREE.BoxGeometry(2, 1, 2);
+            const standMat = new THREE.MeshStandardMaterial({ color: 0xaaaaaa });
+            const stand = new THREE.Mesh(standGeom, standMat);
+            stand.castShadow = true;
+            stand.receiveShadow = true;
+            
+            stand.position.set(standX, 0.5, standZ);
+            scene.add(stand);
+
+            
+            const loader = new THREE.GLTFLoader();
+            loader.load(
+                modelPath,
+                function(gltf) {
+                    const model = gltf.scene;
+
+                   
+                    model.scale.set(scaleVal, scaleVal, scaleVal);
+
+                    
+                    const box = new THREE.Box3().setFromObject(model);
+                    const size = box.getSize(new THREE.Vector3());
+                    const center = box.getCenter(new THREE.Vector3());
+
+                    
+                    model.position.x -= center.x;
+                    model.position.y -= center.y;
+                    model.position.z -= center.z;
+
+                 
+                    const standTopY = 1;  // the top of the stand
+                    const halfHeight = size.y / 2;
+                    model.position.x = standX;
+                    model.position.z = standZ;
+                    model.position.y = standTopY + halfHeight;
+
+                    
+                    if (modelPath.includes('statue')) {
+                        model.position.y -= 0.5;
+                        model.position.z -= -3;
+                    }
+                    if (modelPath.includes('candles_set')) {
+                        model.position.y -= 0.4;
+                        model.position.z -= 0.1;
+                    }
+                    if (modelPath.includes('vase2')) {
+                        model.position.y -= 0.4;
+                        model.position.z -= 0.1;
+                    }
+
+                   
+                    model.traverse((child) => {
+                        if (child.isMesh) {
+                            child.castShadow = true;
+                            child.receiveShadow = true;
+                        }
+                    });
+
+                    
+                    if (modelPath.includes('vase')) {
+                        model.userData.isAnimated = true;
+                        model.userData.rotationSpeed = 0.01;
+                    }
+
+                   
+                    scene.add(model);
+                },
+                undefined,
+                function(error) {
+                    console.error('Error loading model:', error);
+                }
+            );
+        }
+
+        /**
+         * onWindowResize()
+         * -------------------------------------------------
+         * Summary: Adjusts the camera and renderer when the window size changes.
+         * - Updates the camera's aspect ratio
+         * - Resizes the renderer's output
+         */
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        /**
+         * updateMovement(delta)
+         * -------------------------------------------------
+         * Summary: Handles camera movement based on keyboard flags each frame.
+         * - moveForward / moveBackward / moveLeft / moveRight
+         * - Adjusts camera rotation for lookLeft / lookRight / lookUp / lookDown
+         * @param {number} delta - Time elapsed between frames (in seconds)
+         */
+        function updateMovement(delta) {
+            
+            velocity.x = 0;
+            velocity.z = 0;
+
+            // direction.z = (moveForward ? 1 : 0) - (moveBackward ? 1 : 0)
+            direction.z = Number(moveForward) - Number(moveBackward);
+            direction.x = Number(moveRight) - Number(moveLeft);
+            direction.normalize();
+
+            const speed = 5.0;
+            if (moveForward || moveBackward) velocity.z -= direction.z * speed * delta;
+            if (moveLeft || moveRight) velocity.x -= direction.x * speed * delta;
+
+            
+            const rotationSpeed = 2.0;
+            if (lookLeft) camera.rotation.y += rotationSpeed * delta;
+            if (lookRight) camera.rotation.y -= rotationSpeed * delta;
+            
+            
+            const verticalRotationSpeed = 1.0;
+            if (lookUp) {
+                camera.rotation.x = Math.max(
+                    camera.rotation.x - verticalRotationSpeed * delta,
+                    -Math.PI / 2
+                );
+            }
+            if (lookDown) {
+                camera.rotation.x = Math.min(
+                    camera.rotation.x + verticalRotationSpeed * delta,
+                    Math.PI / 2
+                );
+            }
+
+            
+            camera.translateX(velocity.x);
+            camera.translateZ(velocity.z);
+        }
+
+        /**
+         * animate()
+         * ------------------------------------------
+         * Summary: The main animation/render loop called every frame.
+         * - Calculates delta time
+         * - Updates camera movement
+         * - Rotates objects that have isAnimated set to true
+         * - Renders the scene from the camera's perspective
+         */
+        function animate() {
+            requestAnimationFrame(animate);
+            const delta = clock.getDelta(); 
+
+            
+            updateMovement(delta);
+
+            
+            scene.traverse((object) => {
+                if (object.userData.isAnimated) {
+                   
+                    if (object.userData.rotationSpeed) {
+                        object.rotation.y += object.userData.rotationSpeed;
+                    } else {
+                        
+                        object.rotation.x += 0.01;
+                        object.rotation.y += 0.01;
+                    }
+                }
+            });
+
+            // Render the updated scene
+            renderer.render(scene, camera);
+        }
+
+        // Call init() to start everything
+        init();
+    </script>
+</body>
+</html>

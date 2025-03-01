@@ -1,0 +1,8 @@
+Model Information:
+* title:	Vase 01
+* source:	https://sketchfab.com/3d-models/vase-01-82fb84b3700f42789135a9a21ae6c76d
+* author:	Nichgon (https://sketchfab.com/nichgon)
+
+Model License:
+* license type:	SKETCHFAB Standard (https://sketchfab.com/licenses)
+* requirements:	Under basic restrictions, use worldwide, on all types of media, commercially or not, and in all types of derivative works
